@@ -39,6 +39,10 @@ uvicorn api.server:app --reload --host 127.0.0.1 --port 8000
 - Health/docs: OpenAPI at `http://127.0.0.1:8000/docs`
 - Main endpoint: `POST /debate/stream` — Server-Sent Events (SSE) stream of debate messages and final ADR payload
 
+### Session history (SQLite)
+
+Completed debates are persisted automatically. Stopped (partial) runs are saved when you use **Stop debate**. The database file defaults to `backend/data/stack_fight_club.db` (gitignored). Set **`SQLITE_PATH`** in `.env` to use another path. REST: `GET /sessions`, `GET /sessions/{id}`, `POST /sessions`, `DELETE /sessions/{id}` — the UI lists and restores sessions under **Saved sessions** in the left panel.
+
 ## Frontend setup
 
 ```bash

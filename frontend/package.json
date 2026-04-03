@@ -1,5 +1,5 @@
 {
-  "name": "architecture-adr-ui",
+  "name": "stack-fight-club-ui",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "framer-motion": "^11.18.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

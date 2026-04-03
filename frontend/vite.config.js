@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/debate': { target: backend, changeOrigin: true },
+        '/sessions': { target: backend, changeOrigin: true },
         '/health': { target: backend, changeOrigin: true },
       },
     },

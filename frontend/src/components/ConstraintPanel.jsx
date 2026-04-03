@@ -1,8 +1,11 @@
+import { motion } from 'framer-motion'
+
 export default function ConstraintPanel({ constraints }) {
   if (!constraints) {
     return (
-      <p className="mt-3 text-xs text-muted">
-        Constraints appear here after Round 1 (Constraint Validator).
+      <p className="mt-4 text-xs leading-relaxed text-muted">
+        Constraints appear here after <span className="font-semibold text-secondary">Round 1</span> (Constraint
+        Validator).
       </p>
     )
   }
@@ -20,36 +23,46 @@ export default function ConstraintPanel({ constraints }) {
 
   return (
     <div className="mt-4 space-y-3">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted">Extracted constraints</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Extracted constraints</p>
       <div className="flex flex-wrap gap-2">
-        {entries.map(([k, v]) => (
-          <span
+        {entries.map(([k, v], i) => (
+          <motion.span
             key={k}
-            className="rounded-md border border-amber-900/50 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-100/90"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.04 }}
+            whileHover={{ scale: 1.03 }}
+            className="rounded-lg border border-amber-800/45 bg-gradient-to-br from-amber-950/50 to-amber-950/25 px-2.5 py-1.5 text-[11px] text-amber-100/92 shadow-sm"
           >
             {k.replace(/_/g, ' ')}: {String(v)}
-          </span>
+          </motion.span>
         ))}
-        {compliance.map((c) => (
-          <span
+        {compliance.map((c, i) => (
+          <motion.span
             key={c}
-            className="rounded-md border border-amber-900/50 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-100/90"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: (entries.length + i) * 0.04 }}
+            className="rounded-lg border border-amber-800/45 bg-gradient-to-br from-amber-950/50 to-amber-950/25 px-2.5 py-1.5 text-[11px] text-amber-100/92"
           >
             compliance: {c}
-          </span>
+          </motion.span>
         ))}
       </div>
       {blockers.length > 0 ? (
         <div>
-          <p className="mb-2 text-xs font-medium text-red-300/90">Hard blockers</p>
+          <p className="mb-2 text-xs font-semibold text-red-300/95">Hard blockers</p>
           <div className="flex flex-col gap-2">
-            {blockers.map((b) => (
-              <div
+            {blockers.map((b, i) => (
+              <motion.div
                 key={b}
-                className="rounded-md border border-red-900/60 bg-red-950/50 px-2 py-1.5 text-[11px] text-red-100/95"
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="rounded-lg border border-red-900/55 bg-red-950/45 px-2.5 py-1.5 text-[11px] text-red-100/95"
               >
                 {b}
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>

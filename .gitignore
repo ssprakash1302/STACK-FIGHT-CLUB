@@ -10,6 +10,9 @@ ENV/
 *.egg-info/
 *.egg
 
+# Local SQLite (optional override path — default under backend/data/)
+backend/data/*.db
+
 # Secrets and local env (never commit)
 .env
 .env.local

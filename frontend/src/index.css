@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --sfc-gold: #d4af37;
+  --sfc-gold-mid: #c9a227;
+  --sfc-void: #070708;
+}
+
 html,
 body,
 #root {
@@ -10,9 +16,61 @@ body,
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background: #0f0f0f;
-  color: #e8e6e0;
+  font-family: Outfit, system-ui, sans-serif;
+  background: var(--sfc-void);
+  color: #f4f1ea;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer utilities {
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #f0d875 0%, var(--sfc-gold) 45%, #9a7b2c 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .border-gradient-cta {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.5), rgba(139, 41, 66, 0.35), rgba(212, 175, 55, 0.4));
+    padding: 1px;
+    border-radius: 0.75rem;
+  }
+
+  .arena-corner-tl::before,
+  .arena-corner-tl::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: rgba(212, 175, 55, 0.35);
+    border-style: solid;
+    pointer-events: none;
+  }
+  .arena-corner-tl::before {
+    top: 0;
+    left: 0;
+    border-width: 2px 0 0 2px;
+  }
+  .arena-corner-tl::after {
+    bottom: 0;
+    right: 0;
+    border-width: 0 2px 2px 0;
+  }
+
+  .scrollbar-sfc {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212, 175, 55, 0.25) transparent;
+  }
+  .scrollbar-sfc::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-sfc::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-sfc::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.25);
+    border-radius: 3px;
+  }
 }
 
 @keyframes pulse-dot {
@@ -34,5 +92,40 @@ body {
 @keyframes ring-fill {
   from {
     stroke-dashoffset: 283;
+  }
+}
+
+@keyframes knockout-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-3px);
+  }
+  40% {
+    transform: translateX(3px);
+  }
+  60% {
+    transform: translateX(-2px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+.animate-knockout {
+  animation: knockout-shake 0.45s ease-out;
+}
+
+/* Respect OS “reduce motion” for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

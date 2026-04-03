@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 const API_BASE = ''
 
@@ -55,6 +55,11 @@ export function useDebateStream() {
   const [isReplaying, setIsReplaying] = useState(false)
   const [streamError, setStreamError] = useState(null)
 
+  const abortRef = useRef(null)
+  const userCancelledRef = useRef(false)
+  /** Bumps when a new stream starts or session resets so stale `finally` blocks cannot flip global loading state. */
+  const streamGenerationRef = useRef(0)
+
   const bumpScore = useCallback((agentId, delta) => {
     const arch = AGENT_TO_ARCH[agentId]
     if (!arch) return
@@ -65,82 +70,122 @@ export function useDebateStream() {
     })
   }, [])
 
-  const startDebate = useCallback(async (requirements) => {
-    setMessages([])
-    setConstraints(null)
-    setAdr(null)
-    setArchitectureScores(initialScores())
-    setReplayVisible([])
-    setActiveAgent(null)
-    setCurrentRound(null)
-    setStreamError(null)
-    setIsStreaming(true)
+  /** Stops the in-flight SSE stream (partial transcript is kept). */
+  const cancelDebate = useCallback(() => {
+    userCancelledRef.current = true
+    abortRef.current?.abort()
+  }, [])
 
-    const response = await fetch(`${API_BASE}/debate/stream`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requirements }),
-    })
+  const startDebate = useCallback(
+    async (requirements) => {
+      streamGenerationRef.current += 1
+      const generation = streamGenerationRef.current
+      userCancelledRef.current = false
+      abortRef.current?.abort()
+      const ac = new AbortController()
+      abortRef.current = ac
 
-    if (!response.ok) {
-      setStreamError(`HTTP ${response.status}`)
-      setIsStreaming(false)
-      return
-    }
+      setMessages([])
+      setConstraints(null)
+      setAdr(null)
+      setArchitectureScores(initialScores())
+      setReplayVisible([])
+      setActiveAgent(null)
+      setCurrentRound(null)
+      setStreamError(null)
+      setIsStreaming(true)
 
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
+      try {
+        const response = await fetch(`${API_BASE}/debate/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requirements }),
+          signal: ac.signal,
+        })
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const parsed = parseSSEBlocks(buffer)
-        buffer = parsed.rest
-        for (const { eventType, data } of parsed.events) {
-          if (eventType === 'constraints') {
-            setConstraints(data)
-          } else if (eventType === 'message') {
-            setActiveAgent(data.agent_id)
-            setCurrentRound(data.round)
-            setMessages((prev) => [...prev, data])
-            const round = data.round
-            if (
-              (round === 'opening' || round === 'rebuttal') &&
-              AGENT_TO_ARCH[data.agent_id]
-            ) {
-              bumpScore(data.agent_id, 0.04)
+        if (!response.ok) {
+          setStreamError(`HTTP ${response.status}`)
+          if (generation === streamGenerationRef.current) setIsStreaming(false)
+          return
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) {
+          setStreamError('No response body')
+          if (generation === streamGenerationRef.current) setIsStreaming(false)
+          return
+        }
+
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            const parsed = parseSSEBlocks(buffer)
+            buffer = parsed.rest
+            for (const { eventType, data } of parsed.events) {
+              if (eventType === 'constraints') {
+                setConstraints(data)
+              } else if (eventType === 'message') {
+                setActiveAgent(data.agent_id)
+                setCurrentRound(data.round)
+                setMessages((prev) => [...prev, data])
+                const round = data.round
+                if ((round === 'opening' || round === 'rebuttal') && AGENT_TO_ARCH[data.agent_id]) {
+                  bumpScore(data.agent_id, 0.04)
+                }
+                if (data.agent_id === 'devils_advocate') {
+                  setArchitectureScores((prev) => {
+                    const next = { ...prev }
+                    ARCH_KEYS.forEach((k) => {
+                      next[k] = Math.max(0, (next[k] || 0) - 0.02)
+                    })
+                    return next
+                  })
+                }
+              } else if (eventType === 'adr') {
+                setAdr(data)
+                setActiveAgent(null)
+                if (data.architecture_scores && typeof data.architecture_scores === 'object') {
+                  setArchitectureScores((prev) => ({ ...prev, ...data.architecture_scores }))
+                }
+              } else if (eventType === 'error') {
+                setStreamError(data.message || 'Debate failed on the server.')
+                setActiveAgent(null)
+              } else if (eventType === 'done') {
+                setActiveAgent(null)
+              }
             }
-            if (data.agent_id === 'devils_advocate') {
-              setArchitectureScores((prev) => {
-                const next = { ...prev }
-                ARCH_KEYS.forEach((k) => {
-                  next[k] = Math.max(0, (next[k] || 0) - 0.02)
-                })
-                return next
-              })
-            }
-          } else if (eventType === 'adr') {
-            setAdr(data)
-            setActiveAgent(null)
-            if (data.architecture_scores && typeof data.architecture_scores === 'object') {
-              setArchitectureScores((prev) => ({ ...prev, ...data.architecture_scores }))
-            }
-          } else if (eventType === 'error') {
-            setStreamError(data.message || 'Debate failed on the server.')
-            setActiveAgent(null)
-          } else if (eventType === 'done') {
-            setActiveAgent(null)
+          }
+        } finally {
+          try {
+            reader.releaseLock()
+          } catch {
+            /* already released */
           }
         }
+      } catch (err) {
+        if (ac.signal.aborted || err?.name === 'AbortError') {
+          if (userCancelledRef.current) {
+            setStreamError('Debate stopped — you can export the partial transcript from the verdict panel.')
+          }
+        } else {
+          setStreamError(err?.message || 'Network error')
+        }
+      } finally {
+        if (generation === streamGenerationRef.current) {
+          setIsStreaming(false)
+          setActiveAgent(null)
+        }
+        userCancelledRef.current = false
+        if (abortRef.current === ac) abortRef.current = null
       }
-    } finally {
-      setIsStreaming(false)
-      setActiveAgent(null)
-    }
-  }, [bumpScore])
+    },
+    [bumpScore]
+  )
 
   const startReplay = useCallback(
     (allMessages, delayMs = 600) => {
@@ -162,6 +207,45 @@ export function useDebateStream() {
     [isReplaying]
   )
 
+  const resetSession = useCallback(() => {
+    streamGenerationRef.current += 1
+    userCancelledRef.current = false
+    abortRef.current?.abort()
+    setIsStreaming(false)
+    setActiveAgent(null)
+    setMessages([])
+    setConstraints(null)
+    setAdr(null)
+    setActiveAgent(null)
+    setCurrentRound(null)
+    setArchitectureScores(initialScores())
+    setReplayVisible([])
+    setIsReplaying(false)
+    setStreamError(null)
+  }, [])
+
+  /** Restore UI from a row returned by GET /sessions/:id */
+  const hydrateSession = useCallback((record) => {
+    streamGenerationRef.current += 1
+    abortRef.current?.abort()
+    userCancelledRef.current = false
+    setIsStreaming(false)
+    setActiveAgent(null)
+    setMessages(Array.isArray(record.messages) ? record.messages : [])
+    setConstraints(record.constraints ?? null)
+    setAdr(record.adr ?? null)
+    const base = initialScores()
+    const scores = record.adr?.architecture_scores
+    if (scores && typeof scores === 'object') {
+      Object.assign(base, scores)
+    }
+    setArchitectureScores(base)
+    setReplayVisible([])
+    setIsReplaying(false)
+    setStreamError(record.error_message ?? null)
+    setCurrentRound(null)
+  }, [])
+
   return {
     messages,
     constraints,
@@ -175,5 +259,8 @@ export function useDebateStream() {
     streamError,
     startDebate,
     startReplay,
+    resetSession,
+    cancelDebate,
+    hydrateSession,
   }
 }
