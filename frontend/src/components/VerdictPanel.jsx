@@ -7,6 +7,7 @@ import {
   buildTranscriptMarkdown,
   copyTextToClipboard,
 } from '../utils/exportAdr'
+import MermaidDiagram from './MermaidDiagram'
 
 /* ─── Confidence ring ──────────────────────────────────── */
 function ConfidenceRing({ score }) {
@@ -207,13 +208,16 @@ function VerdictContent({ adr, pros, cons }) {
       )}
 
       {adr.mermaid_diagram?.trim() ? (
-        <Section title="Architecture sketch (Mermaid)" accent="#378ADD">
-          <details className="group rounded-xl border border-border bg-depth/70 open:border-gold-dim/30">
-            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-secondary">
+        <Section title="Architecture diagram" accent="#378ADD">
+          <div className="rounded-xl border border-border bg-depth/70 p-4">
+            <MermaidDiagram code={adr.mermaid_diagram} />
+          </div>
+          <details className="group mt-2 rounded-xl border border-border bg-depth/50 open:border-gold-dim/25">
+            <summary className="cursor-pointer select-none px-4 py-2.5 text-xs font-semibold text-muted">
               <span className="mr-2 inline-block transition-transform group-open:rotate-90">▸</span>
-              View diagram source
+              Mermaid source (copy / debug)
             </summary>
-            <pre className="max-h-56 overflow-auto border-t border-border px-4 py-3 font-mono text-[11px] leading-relaxed text-secondary">
+            <pre className="max-h-48 overflow-auto border-t border-border px-4 py-3 font-mono text-[11px] leading-relaxed text-secondary">
               {adr.mermaid_diagram.trim()}
             </pre>
           </details>
